@@ -1,11 +1,17 @@
-import useTranslation from 'next-translate/useTranslation'
+import dynamic from 'next/dynamic'
+const Player = dynamic(() => import('ui/components/Player'), { ssr: false })
+
+import config from 'config'
 
 const Home = () => {
-  const { t } = useTranslation()
+  const license = config.video.license
+  const manifest = config.video.manifest
+  const subtitle = config.video.subtitle
+
   return (
     <>
-      <h1>Home</h1>
-      <p>{t('common:title')}</p>
+      <h1>Shaka player test</h1>
+      <Player license={license} manifest={manifest} subtitle={subtitle} />
     </>
   )
 }
