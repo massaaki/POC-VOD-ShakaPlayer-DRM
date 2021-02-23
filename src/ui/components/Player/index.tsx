@@ -91,6 +91,8 @@ function usePlayerState(videoRef) {
       return t.language === language
     })
 
+    console.log('track..:', track)
+
     addSubtitle(track)
   }
 
@@ -362,13 +364,6 @@ const Player = ({ manifest, license, subtitle }: PlayerProps) => {
           }}
         >
           + 30s
-        </button>
-        <button
-          onClick={() => {
-            videoRef.current.play()
-          }}
-        >
-          FORCE PLAY
         </button>
 
         <button onClick={() => findTextTrack('pt-br')}>LEGENDA: pt-br</button>
