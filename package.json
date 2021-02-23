@@ -31,6 +31,7 @@
     ]
   },
   "dependencies": {
+    "@alugha/ima": "^2.0.2",
     "@typescript-eslint/eslint-plugin": "^4.10.0",
     "@typescript-eslint/parser": "^4.10.0",
     "eslint": "^7.16.0",
