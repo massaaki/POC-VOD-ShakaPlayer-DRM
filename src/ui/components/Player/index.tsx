@@ -4,6 +4,8 @@ import shaka from 'shaka-player'
 import { loadImaSdk } from 'utils/ads'
 import type { google } from 'utils/ads/ima'
 
+import config from 'config'
+
 import styles from './styles.module.scss'
 
 export enum DrmType {
@@ -19,13 +21,15 @@ export type PlayerProps = {
 }
 
 //Global var
+const NEXT_ADS_STARTS_IN = 1000 * 10
 let player
 let ima
 let adsLoader
 let adsRequest: google.ima.AdsRequest
 let adsManager: google.ima.AdsManager
 let adDisplayContainer
-let adsLoaded = false
+const adsLoaded = false
+let intervalTimer
 // let adDisplayContainer: google.ima.AdDisplayContainer
 
 // player hook
@@ -167,11 +171,7 @@ function usePlayerAds(videoRef, adContainerRef) {
     })
 
     adsRequest = new google.ima.AdsRequest()
-    adsRequest.adTagUrl =
-      'https://pubads.g.doubleclick.net/gampad/ads?' +
-      'sz=640x480&iu=/124319096/external/single_ad_samples&ciu_szs=300x250&' +
-      'impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&' +
-      'cust_params=deployment%3Ddevsite%26sample_ct%3Dlinear&correlator='
+    adsRequest.adTagUrl = config.adTagUrl
 
     adsRequest.linearAdSlotWidth = videoRef.current.clientWidth
     adsRequest.linearAdSlotHeight = videoRef.current.clientHeight
@@ -198,12 +198,46 @@ function usePlayerAds(videoRef, adContainerRef) {
       google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED,
       onContentResumeRequested
     )
-    adsManager.addEventListener(google.ima.AdEvent.Type.LOADED, onAdLoaded)
+    // adsManager.addEventListener(google.ima.AdEvent.Type.LOADED, onAdLoaded)
+
+    // Listen to any additional events, if necessary.
+    adsManager.addEventListener(google.ima.AdEvent.Type.LOADED, onAdEvent)
+    adsManager.addEventListener(google.ima.AdEvent.Type.STARTED, onAdEvent)
+    adsManager.addEventListener(google.ima.AdEvent.Type.COMPLETE, onAdEvent)
+    adsManager.addEventListener(google.ima.AdEvent.Type.SKIPPED, onAdEvent)
   }
-  function onAdLoaded(adEvent) {
+
+  function onAdEvent(adEvent) {
     const ad = adEvent.getAd()
-    if (!ad.isLinear()) {
-      videoRef.current.play()
+    switch (adEvent.type) {
+      case google.ima.AdEvent.Type.LOADED:
+        console.log('ima-events::Loaded')
+        if (!ad.isLinear()) {
+          videoRef.current.play()
+        }
+        break
+      case google.ima.AdEvent.Type.STARTED:
+        console.log('ima-events::started')
+        if (ad.isLinear()) {
+          intervalTimer = setInterval(function () {
+            adsManager.getRemainingTime()
+          }, 1000) // every 1s
+        }
+        break
+      case google.ima.AdEvent.Type.COMPLETE:
+        console.log('ima-events::complete')
+        if (ad.isLinear()) {
+          clearInterval(intervalTimer)
+        }
+        reloadAds()
+        break
+      case google.ima.AdEvent.Type.SKIPPED:
+        console.log('ima-events::SKIPPED')
+        if (ad.isLinear()) {
+          clearInterval(intervalTimer)
+        }
+        reloadAds()
+        break
     }
   }
 
@@ -222,17 +256,8 @@ function usePlayerAds(videoRef, adContainerRef) {
     }
   }
 
-  function loadAds(event) {
-    // prevent this function from running on every play event
-    if (adsLoaded) {
-      return
-    }
-    adsLoaded = true
-
-    // prevent triggering immediate playback when ads are loading
-    // event.preventDefault()
+  function loadAds() {
     console.log('loading ads')
-
     // Initialize the container. Must be done via a user action on mobile devices.
     // videoRef.current.load()
     adDisplayContainer.initialize()
@@ -247,6 +272,23 @@ function usePlayerAds(videoRef, adContainerRef) {
       console.log('AdsManager could not be started')
       videoRef.current.play()
     }
+  }
+
+  function reloadAds() {
+    if (adsLoader) {
+      adsLoader.contentComplete()
+    }
+
+    const adsRequest = new google.ima.AdsRequest()
+    adsRequest.adTagUrl =
+      'https://pubads.g.doubleclick.net/gampad/ads?iu=/22106339974/test-netmovies&description_url=http%3A%2F%2Fnetmovies.com.br&tfcd=0&npa=0&sz=640x480&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&correlator='
+
+    adsLoader.requestAds(adsRequest)
+
+    setTimeout(() => {
+      console.log('Started Ads again...')
+      loadAds()
+    }, NEXT_ADS_STARTS_IN)
   }
 
   return {
